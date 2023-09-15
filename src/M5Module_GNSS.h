@@ -4,6 +4,6 @@
 #include <Arduino.h>
 #include <Wire.h>
 
-#include "M5_BMI270_BMM150.h"
+#include "BMI270.h"
 
 #endif

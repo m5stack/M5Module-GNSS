@@ -1,10 +1,9 @@
-
 /**
  * @file getSensorData.ino
  * @author SeanKwok (shaoxiang@m5stack.com)
  * @brief M5Module GNSS Get Sensor Data Demo.
- * @version 0.1
- * @date 2023-08-31
+ * @version 0.2
+ * @date 2023-09-15
  *
  *
  * @Hardwares:M5Module GNSS
@@ -17,12 +16,11 @@
 #include "M5Module_GNSS.h"
 #include <Adafruit_BMP280.h>
 
-M5_BMI270_BMM150 bmi270_bmm150(&Wire);
-Adafruit_BMP280 bmp(&Wire);
-
 #define BIM270_SENSOR_ADDR 0x68
-#define BMM150_SENSOR_ADDR 0x10
 #define BMP280_SENSOR_ADDR 0x76
+
+BMI270::BMI270 bmi270;
+Adafruit_BMP280 bmp(&Wire);
 
 void setup() {
     // put your setup code here, to run once:
@@ -32,9 +30,7 @@ void setup() {
     while (!Serial)
         ;
 
-    unsigned status;
-
-    status = bmp.begin(BMP280_SENSOR_ADDR);
+    unsigned status = bmp.begin(BMP280_SENSOR_ADDR);
     if (!status) {
         Serial.println(
             F("Could not find a valid BMP280 sensor, check wiring or "
@@ -44,23 +40,15 @@ void setup() {
         while (1) delay(10);
     }
 
-    bmi270_bmm150.debug(Serial);
-    status = bmi270_bmm150.begin(BIM270_SENSOR_ADDR, BMM150_SENSOR_ADDR);
-    if (!status) {
-        Serial.println("sensor init error");
-        while (1) delay(10);
-    };
-
-    Serial.print("Accelerometer sample rate = ");
-    Serial.println(bmi270_bmm150.accelerationSampleRate());
+    bmi270.init(I2C_NUM_0, BIM270_SENSOR_ADDR);
 }
 
 void loop() {
     // put your main code here, to run repeatedly:
     float x, y, z;
 
-    if (bmi270_bmm150.accelerationAvailable()) {
-        bmi270_bmm150.readAcceleration(x, y, z);
+    if (bmi270.accelerationAvailable()) {
+        bmi270.readAcceleration(x, y, z);
 
         Serial.print("accel: \t");
         Serial.print(x);
@@ -71,8 +59,8 @@ void loop() {
         Serial.println();
     }
 
-    if (bmi270_bmm150.gyroscopeAvailable()) {
-        bmi270_bmm150.readGyroscope(x, y, z);
+    if (bmi270.gyroscopeAvailable()) {
+        bmi270.readGyroscope(x, y, z);
 
         Serial.print("gyro: \t");
         Serial.print(x);
@@ -83,8 +71,9 @@ void loop() {
         Serial.println();
     }
 
-    if (bmi270_bmm150.magneticFieldAvailable()) {
-        bmi270_bmm150.readMagneticField(x, y, z);
+    if (bmi270.magneticFieldAvailable()) {
+        int16_t mx, my, mz = 0;
+        bmi270.readMagneticField(mx, my, mz);
 
         Serial.print("mag: \t");
         Serial.print(x);
