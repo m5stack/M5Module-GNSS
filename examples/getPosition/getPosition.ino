@@ -24,7 +24,7 @@ static void printStr(const char *str, int len);
 
 void setup() {
     Serial.begin(115200);
-    Serial2.begin(115200, SERIAL_8N1, 16, 17);
+    Serial2.begin(38400, SERIAL_8N1, 16, 17);
 
     Serial.println();
     Serial.println(F(
