@@ -36,7 +36,7 @@
 namespace BMI270 {
 
     struct dev_info {
-        i2c_port_t i2c_port = 0;
+        i2c_port_t i2c_port = I2C_NUM_0;
         uint8_t dev_addr;
     };
 
