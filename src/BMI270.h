@@ -28,7 +28,8 @@
 */
 #include "utilities/BMI270-Sensor-API/bmi270.h"
 #include "utilities/BMM150-Sensor-API/bmm150.h"
-#include <driver/i2c.h>
+#include <Wire.h>
+#include <hal/i2c_types.h> // header-only, only needed for the deprecated i2c_port_t overload below
 #include <iostream>
 #include <string>
 
@@ -36,14 +37,14 @@
 namespace BMI270 {
 
     struct dev_info {
-        i2c_port_t i2c_port = I2C_NUM_0;
+        TwoWire* wire = &Wire;
         uint8_t dev_addr;
     };
 
 
     class BMI270 {
         private:
-            i2c_port_t _i2c_port;
+            TwoWire* _wire = &Wire;
 
             bool _initialized = false;
             int _interrupts = 0;
@@ -81,6 +82,13 @@ namespace BMI270 {
             void setContinuousMode();
             void oneShotMode();
 
+            int init(TwoWire& wire, uint8_t bmiAddr);
+
+            // Deprecated: kept for source compatibility with the old ESP-IDF driver/i2c.h based
+            // API. I2C_NUM_0 maps to Wire, I2C_NUM_1 maps to Wire1. Only <hal/i2c_types.h> (a
+            // header-only type definition) is needed for i2c_port_t here, so this overload does
+            // not pull in the legacy driver/i2c.c object file and its Arduino core 3.x /
+            // ESP-IDF 5.x driver_ng conflict.
             int init(i2c_port_t i2c_port, uint8_t bmiAddr);
 
 

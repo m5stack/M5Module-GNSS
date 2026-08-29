@@ -52,7 +52,14 @@ namespace BMI270 {
 
     int BMI270::init(i2c_port_t i2c_port, uint8_t bmiAddr)
     {
-        _i2c_port = i2c_port;
+        TwoWire& wire = (i2c_port == I2C_NUM_1) ? Wire1 : Wire;
+        return init(wire, bmiAddr);
+    }
+
+
+    int BMI270::init(TwoWire& wire, uint8_t bmiAddr)
+    {
+        _wire = &wire;
 
 
         /* BMI270 init */
@@ -67,7 +74,7 @@ namespace BMI270 {
         bmi2.read_write_len = 30;    // Limitation of the Wire library
         bmi2.config_file_ptr = NULL; // Use the default BMI270 config file
 
-        accel_gyro_dev_info.i2c_port = _i2c_port;
+        accel_gyro_dev_info.wire = _wire;
         accel_gyro_dev_info.dev_addr = bmi2.chip_id;
 
         int8_t rslt = bmi270_init(&bmi2);
@@ -143,7 +150,7 @@ namespace BMI270 {
         bmm1.intf = BMM150_I2C_INTF;
         bmm1.intf_ptr = &mag_dev_info;
 
-        mag_dev_info.i2c_port = _i2c_port;
+        mag_dev_info.wire = _wire;
         mag_dev_info.dev_addr = bmm1.chip_id;
 
 
@@ -629,24 +636,32 @@ namespace BMI270 {
 
 
 
-    /* I2C W/R buffer */
-    static uint8_t _data_buffer[32];
-    static esp_err_t _i2c_ret;
-    struct dev_info* _dev_info;
-
-
+    /* I2C register R/W, 32 bytes max per transaction (bmi2.read_write_len above) */
     int8_t BMI270::bmi2_i2c_read(uint8_t reg_addr, uint8_t *reg_data, uint32_t len, void *intf_ptr)
     {
         if ((reg_data == NULL) || (len == 0) || (len > 32)) {
             return -1;
         }
 
-        _dev_info = (struct dev_info*)intf_ptr;
+        struct dev_info* dev_info = (struct dev_info*)intf_ptr;
+        TwoWire* wire = dev_info->wire;
 
-        _i2c_ret = i2c_master_write_read_device(_dev_info->i2c_port, _dev_info->dev_addr, &reg_addr, 1, reg_data, len, portMAX_DELAY);
-        if (_i2c_ret != ESP_OK) {
-            ESP_LOGE(TAG, "P:%d R %02X %02X E:%d", _dev_info->i2c_port, _dev_info->dev_addr, reg_addr, _i2c_ret);
+        wire->beginTransmission(dev_info->dev_addr);
+        wire->write(reg_addr);
+        uint8_t tx_ret = wire->endTransmission(false); // repeated start, no stop before the read
+        if (tx_ret != 0) {
+            ESP_LOGE(TAG, "A:%02X R %02X endTransmission:%d", dev_info->dev_addr, reg_addr, tx_ret);
             return -1;
+        }
+
+        size_t received = wire->requestFrom((uint8_t)dev_info->dev_addr, (uint8_t)len);
+        if (received != len) {
+            ESP_LOGE(TAG, "A:%02X R %02X requestFrom got:%u want:%lu", dev_info->dev_addr, reg_addr, (unsigned)received, (unsigned long)len);
+            return -1;
+        }
+
+        for (uint32_t i = 0; i < len; i++) {
+            reg_data[i] = (uint8_t)wire->read();
         }
 
         return 0;
@@ -659,16 +674,15 @@ namespace BMI270 {
             return -1;
         }
 
-        _dev_info = (struct dev_info *)intf_ptr;
+        struct dev_info* dev_info = (struct dev_info*)intf_ptr;
+        TwoWire* wire = dev_info->wire;
 
-        _data_buffer[0] = reg_addr;
-        for (int i = 0; i < len; i++) {
-            _data_buffer[i + 1] = reg_data[i];
-        }
-
-        _i2c_ret = i2c_master_write_to_device(_dev_info->i2c_port, _dev_info->dev_addr, _data_buffer, (len + 1), portMAX_DELAY);
-        if (_i2c_ret != ESP_OK) {
-            ESP_LOGE(TAG, "P:%d W %02X %02X E:%d", _dev_info->i2c_port, _dev_info->dev_addr, reg_addr, _i2c_ret);
+        wire->beginTransmission(dev_info->dev_addr);
+        wire->write(reg_addr);
+        wire->write(reg_data, len);
+        uint8_t tx_ret = wire->endTransmission(true);
+        if (tx_ret != 0) {
+            ESP_LOGE(TAG, "A:%02X W %02X endTransmission:%d", dev_info->dev_addr, reg_addr, tx_ret);
             return -1;
         }
 
