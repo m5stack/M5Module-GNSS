@@ -48,12 +48,33 @@ static bmi2_dev* _bmi2_dev_ptr = nullptr;
 
 
 
+// arduino-esp32 declares Wire1 on every 2.x target, but on 3.x only where it exists (the condition
+// differs per 3.x release); a second HP I2C controller implies Wire1 in every release.
+#if ESP_IDF_VERSION_MAJOR < 5
+#define BMI270_HAS_WIRE1 1
+#elif defined(SOC_HP_I2C_NUM)
+#define BMI270_HAS_WIRE1 (SOC_HP_I2C_NUM > 1)
+#else
+#define BMI270_HAS_WIRE1 (SOC_I2C_NUM > 1)
+#endif
+
+
 namespace BMI270 {
 
     int BMI270::init(i2c_port_t i2c_port, uint8_t bmiAddr)
     {
-        TwoWire& wire = (i2c_port == I2C_NUM_1) ? Wire1 : Wire;
-        return init(wire, bmiAddr);
+#if !defined(NO_GLOBAL_INSTANCES) && !defined(NO_GLOBAL_WIRE)
+        if (i2c_port == 0) {
+            return init(Wire, bmiAddr);
+        }
+#if BMI270_HAS_WIRE1
+        if (i2c_port == 1) {
+            return init(Wire1, bmiAddr);
+        }
+#endif
+#endif
+        ESP_LOGE(TAG, "No global TwoWire for I2C port %d (addr 0x%02X), use init(TwoWire&, uint8_t)", (int)i2c_port, bmiAddr);
+        return false;
     }
 
 

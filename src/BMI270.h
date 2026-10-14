@@ -29,7 +29,14 @@
 #include "utilities/BMI270-Sensor-API/bmi270.h"
 #include "utilities/BMM150-Sensor-API/bmm150.h"
 #include <Wire.h>
-#include <hal/i2c_types.h> // header-only, only needed for the deprecated i2c_port_t overload below
+#include <esp_idf_version.h>
+// i2c_port_t / I2C_NUM_x for the deprecated init(i2c_port_t, ...) overload only. Nothing from the
+// legacy I2C driver is called, so its i2c.c object (and the driver_ng conflict check) is not linked.
+#if ESP_IDF_VERSION_MAJOR >= 5
+#include <hal/i2c_types.h>
+#else
+#include <driver/i2c.h> // IDF 4.x defines I2C_NUM_x here; it has no driver_ng to conflict with
+#endif
 #include <iostream>
 #include <string>
 
@@ -37,14 +44,14 @@
 namespace BMI270 {
 
     struct dev_info {
-        TwoWire* wire = &Wire;
+        TwoWire* wire = nullptr;
         uint8_t dev_addr;
     };
 
 
     class BMI270 {
         private:
-            TwoWire* _wire = &Wire;
+            TwoWire* _wire = nullptr;
 
             bool _initialized = false;
             int _interrupts = 0;
@@ -84,11 +91,8 @@ namespace BMI270 {
 
             int init(TwoWire& wire, uint8_t bmiAddr);
 
-            // Deprecated: kept for source compatibility with the old ESP-IDF driver/i2c.h based
-            // API. I2C_NUM_0 maps to Wire, I2C_NUM_1 maps to Wire1. Only <hal/i2c_types.h> (a
-            // header-only type definition) is needed for i2c_port_t here, so this overload does
-            // not pull in the legacy driver/i2c.c object file and its Arduino core 3.x /
-            // ESP-IDF 5.x driver_ng conflict.
+            // Deprecated, kept for source compatibility: I2C_NUM_0 -> Wire, I2C_NUM_1 -> Wire1
+            // (Wire1 only on chips with two HP I2C controllers). Prefer init(TwoWire&, uint8_t).
             int init(i2c_port_t i2c_port, uint8_t bmiAddr);
 
 
