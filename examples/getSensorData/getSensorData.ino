@@ -40,7 +40,7 @@ void setup() {
         while (1) delay(10);
     }
 
-    bmi270.init(I2C_NUM_0, BIM270_SENSOR_ADDR);
+    bmi270.init(Wire, BIM270_SENSOR_ADDR);
 }
 
 void loop() {

@@ -28,7 +28,15 @@
 */
 #include "utilities/BMI270-Sensor-API/bmi270.h"
 #include "utilities/BMM150-Sensor-API/bmm150.h"
-#include <driver/i2c.h>
+#include <Wire.h>
+#include <esp_idf_version.h>
+// i2c_port_t / I2C_NUM_x for the deprecated init(i2c_port_t, ...) overload only. Nothing from the
+// legacy I2C driver is called, so its i2c.c object (and the driver_ng conflict check) is not linked.
+#if ESP_IDF_VERSION_MAJOR >= 5
+#include <hal/i2c_types.h>
+#else
+#include <driver/i2c.h> // IDF 4.x defines I2C_NUM_x here; it has no driver_ng to conflict with
+#endif
 #include <iostream>
 #include <string>
 
@@ -36,14 +44,14 @@
 namespace BMI270 {
 
     struct dev_info {
-        i2c_port_t i2c_port = I2C_NUM_0;
+        TwoWire* wire = nullptr;
         uint8_t dev_addr;
     };
 
 
     class BMI270 {
         private:
-            i2c_port_t _i2c_port;
+            TwoWire* _wire = nullptr;
 
             bool _initialized = false;
             int _interrupts = 0;
@@ -81,6 +89,10 @@ namespace BMI270 {
             void setContinuousMode();
             void oneShotMode();
 
+            int init(TwoWire& wire, uint8_t bmiAddr);
+
+            // Deprecated, kept for source compatibility: I2C_NUM_0 -> Wire, I2C_NUM_1 -> Wire1
+            // (Wire1 only on chips with two HP I2C controllers). Prefer init(TwoWire&, uint8_t).
             int init(i2c_port_t i2c_port, uint8_t bmiAddr);
 
 
